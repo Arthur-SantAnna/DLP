@@ -1,0 +1,9 @@
+cd C:/Users/mathe/Downloads/dlp_trabalho_unidade_1_versao_02
+
+vlib work
+
+vcom -work work divisor_frequencia.vhd decodificador_7seg.vhd seletor_exibicao.vhd dlp_projeto.vhd tb_controlador_esteira.vhd
+
+vsim work.tb_controlador_esteira
+add wave -position insertpoint sim:/tb_controlador_esteira/UUT/*
+run -all
