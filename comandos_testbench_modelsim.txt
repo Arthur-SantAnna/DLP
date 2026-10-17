@@ -1,3 +1,5 @@
+TESTEBENCH PARA O PROJETO
+
 cd C:/Users/mathe/Downloads/dlp_trabalho_unidade_1_versao_02
 
 vlib work
@@ -7,3 +9,16 @@ vcom -work work divisor_frequencia.vhd decodificador_7seg.vhd seletor_exibicao.v
 vsim work.tb_controlador_esteira
 add wave -position insertpoint sim:/tb_controlador_esteira/UUT/*
 run -all
+
+
+TESTEBENCH PARA O DECODIFICADOR
+
+vcom decodificador_7seg.vhd
+
+vcom tb_decodificador_bcd.vhd
+
+vsim work.tb_decodificador_bcd
+
+add wave /tb_decodificador_bcd/bcd_in
+add wave /tb_decodificador_bcd/seg_out
+run 350 ns
