@@ -13,6 +13,8 @@ run -all
 
 TESTEBENCH PARA O DECODIFICADOR
 
+cd C:/Users/mathe/Downloads/dlp_trabalho_unidade_1_versao_02
+
 vcom decodificador_7seg.vhd
 
 vcom tb_decodificador_bcd.vhd
@@ -22,3 +24,27 @@ vsim work.tb_decodificador_bcd
 add wave /tb_decodificador_bcd/bcd_in
 add wave /tb_decodificador_bcd/seg_out
 run 350 ns
+
+TESTBENCH PARA O TESTE 9
+
+cd C:/Users/mathe/Downloads/dlp_trabalho_unidade_1_versao_02
+
+vcom divisor_frequencia.vhd
+vcom decodificador_7seg.vhd
+vcom seletor_exibicao.vhd
+vcom dlp_projeto.vhd
+vcom tb_teste9_visualizacao.vhd
+
+vsim work.tb_teste9_visualizacao
+
+add wave /tb_teste9_visualizacao/clk_50
+add wave /tb_teste9_visualizacao/rst
+add wave /tb_teste9_visualizacao/pausa
+add wave /tb_teste9_visualizacao/modo
+add wave -radix unsigned /tb_teste9_visualizacao/UUT/reg_N
+add wave -radix unsigned /tb_teste9_visualizacao/UUT/reg_P
+add wave -radix unsigned /tb_teste9_visualizacao/UUT/valor_para_display
+add wave /tb_teste9_visualizacao/hex1
+add wave /tb_teste9_visualizacao/hex0
+
+run 1800 ns
