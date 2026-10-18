@@ -19,9 +19,9 @@ begin
             when 2 => seg <= "0100100"; -- '2'
             when 3 => seg <= "0110000"; -- '3'
             when 4 => seg <= "0011001"; -- '4'
-            when 5 => seg <= "0100010"; -- '5'
-            when 6 => seg <= "0100000"; -- '6'
-            when 7 => seg <= "0001111"; -- '7'
+            when 5 => seg <= "0010010"; -- '5'
+            when 6 => seg <= "0000010"; -- '6'
+            when 7 => seg <= "1111000"; -- '7'
             when 8 => seg <= "0000000"; -- '8'
             when 9 => seg <= "0010000"; -- '9'
             when others => seg <= "1111111"; -- Apagado para BCDs inválidos (10-15)
