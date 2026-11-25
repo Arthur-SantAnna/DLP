@@ -30,9 +30,10 @@ entity rc522_controller is
         -- Pino de Reset Fisico do modulo RC522
         rc522_rst_n  : out std_logic;
         -- Saidas do Cartao Lido
-        card_uid     : out std_logic_vector(31 downto 0);
-        card_valid   : out std_logic; -- Pulso de 1 ciclo quando um novo cartao e lido
-        comm_active  : out std_logic  -- Indica atividade de comunicacao com o RC522
+        card_uid       : out std_logic_vector(31 downto 0);
+        card_valid     : out std_logic; -- Pulso de 1 ciclo quando um novo cartao e lido
+        comm_active    : out std_logic; -- Indica atividade de comunicacao com o RC522
+        version_out    : out std_logic_vector(7 downto 0) -- VersionReg (0x37) para diagnostico SPI
     );
 end entity rc522_controller;
 
@@ -42,7 +43,10 @@ architecture rtl of rc522_controller is
     type rc_state_type is (
         RC_HW_RESET,
         RC_WAIT_BOOT,
+        RC_SOFT_RESET,
+        RC_WAIT_SOFT_RESET,
         RC_INIT_SEQ,
+        RC_READ_VERSION,
         RC_POLL_DELAY,
         RC_REQ_SEQ,
         RC_REQ_WAIT,
@@ -61,10 +65,11 @@ architecture rtl of rc522_controller is
     signal spi_issued  : std_logic := '0';
 
     -- Contadores de tempo (50 MHz: 50_000 ciclos = 1 ms)
-    constant BOOT_CYCLES     : integer := 250000;   -- 5 ms
-    constant TRANS_CYCLES    : integer := 200000;   -- 4 ms para resposta RF do cartao
-    constant POLL_CYCLES     : integer := 2500000;  -- 50 ms entre leituras
-    constant COOLDOWN_CYCLES : integer := 50000000; -- 1.0 s de intervalo apos ler um cartao
+    constant BOOT_CYCLES       : integer := 250000;   -- 5 ms
+    constant SOFT_RESET_CYCLES : integer := 2500000;  -- 50 ms apos Soft Reset (datasheet MFRC522)
+    constant TRANS_CYCLES      : integer := 500000;   -- 10 ms para resposta RF do cartao
+    constant POLL_CYCLES       : integer := 2500000;  -- 50 ms entre leituras
+    constant COOLDOWN_CYCLES   : integer := 50000000; -- 1.0 s de intervalo apos ler um cartao
 
     signal timer_cnt   : integer range 0 to 50000000 := 0;
 
@@ -91,6 +96,7 @@ begin
             card_uid     <= (others => '0');
             card_valid   <= '0';
             comm_active  <= '0';
+            version_out  <= (others => '0');
             uid_buf      <= (others => (others => '0'));
             last_uid     <= (others => '0');
 
@@ -118,13 +124,40 @@ begin
                         timer_cnt  <= 0;
                         step_idx   <= 0;
                         spi_issued <= '0';
+                        state      <= RC_SOFT_RESET;
+                    else
+                        timer_cnt <= timer_cnt + 1;
+                    end if;
+
+                ----------------------------------------------------------------
+                -- 2. Soft Reset do MFRC522 + Espera de 50 ms para estabilizar
+                ----------------------------------------------------------------
+                when RC_SOFT_RESET =>
+                    comm_active <= '1';
+                    if spi_issued = '0' and spi_busy = '0' then
+                        spi_start    <= '1';
+                        spi_rw       <= '0'; -- Escrita
+                        spi_reg_addr <= REG_COMMAND;
+                        spi_tx_data  <= PCD_RESETPHASE;
+                        spi_issued   <= '1';
+                    elsif spi_done = '1' then
+                        spi_issued <= '0';
+                        timer_cnt  <= 0;
+                        state      <= RC_WAIT_SOFT_RESET;
+                    end if;
+
+                when RC_WAIT_SOFT_RESET =>
+                    if SIMULATION_MODE or timer_cnt >= SOFT_RESET_CYCLES then
+                        timer_cnt  <= 0;
+                        step_idx   <= 0;
+                        spi_issued <= '0';
                         state      <= RC_INIT_SEQ;
                     else
                         timer_cnt <= timer_cnt + 1;
                     end if;
 
                 ----------------------------------------------------------------
-                -- 2. Inicializacao dos Registradores Internos do MFRC522
+                -- 3. Inicializacao dos Registradores Internos do MFRC522
                 ----------------------------------------------------------------
                 when RC_INIT_SEQ =>
                     comm_active <= '1';
@@ -133,25 +166,42 @@ begin
                         spi_rw     <= '0'; -- Escrita
                         spi_issued <= '1';
                         case step_idx is
-                            when 0 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_RESETPHASE; -- Soft Reset
-                            when 1 => spi_reg_addr <= REG_T_MODE;      spi_tx_data <= X"8D";          -- TAuto=1
-                            when 2 => spi_reg_addr <= REG_T_PRESCALER; spi_tx_data <= X"3E";          -- TPrescaler
-                            when 3 => spi_reg_addr <= REG_T_RELOAD_L;  spi_tx_data <= X"1E";          -- Timeout 30
-                            when 4 => spi_reg_addr <= REG_T_RELOAD_H;  spi_tx_data <= X"00";
-                            when 5 => spi_reg_addr <= REG_TX_ASK;      spi_tx_data <= X"40";          -- 100% ASK
-                            when 6 => spi_reg_addr <= REG_MODE;        spi_tx_data <= X"3D";          -- CRC 0x6363
-                            when 7 => spi_reg_addr <= REG_TX_CONTROL;  spi_tx_data <= X"83";          -- Liga Antena TX1/TX2
+                            when 0  => spi_reg_addr <= REG_TX_MODE;     spi_tx_data <= X"00"; -- 106 kbps, CRC off
+                            when 1  => spi_reg_addr <= REG_RX_MODE;     spi_tx_data <= X"00"; -- 106 kbps, CRC off
+                            when 2  => spi_reg_addr <= REG_MOD_WIDTH;   spi_tx_data <= X"26"; -- Padrao MFRC522
+                            when 3  => spi_reg_addr <= REG_T_MODE;      spi_tx_data <= X"8D"; -- TAuto=1
+                            when 4  => spi_reg_addr <= REG_T_PRESCALER; spi_tx_data <= X"3E"; -- TPrescaler
+                            when 5  => spi_reg_addr <= REG_T_RELOAD_L;  spi_tx_data <= X"1E"; -- Timeout 30
+                            when 6  => spi_reg_addr <= REG_T_RELOAD_H;  spi_tx_data <= X"00";
+                            when 7  => spi_reg_addr <= REG_TX_ASK;      spi_tx_data <= X"40"; -- 100% ASK
+                            when 8  => spi_reg_addr <= REG_MODE;        spi_tx_data <= X"3D"; -- CRC 0x6363
+                            when 9  => spi_reg_addr <= REG_RF_CFG;      spi_tx_data <= X"70"; -- Ganho RX maximo (48 dB)
+                            when 10 => spi_reg_addr <= REG_TX_CONTROL;  spi_tx_data <= X"83"; -- Liga Antena TX1/TX2
                             when others => spi_reg_addr <= REG_COMMAND; spi_tx_data <= PCD_IDLE;
                         end case;
                     elsif spi_done = '1' then
                         spi_issued <= '0';
-                        if step_idx = 7 then
+                        if step_idx = 10 then
                             step_idx  <= 0;
                             timer_cnt <= 0;
-                            state     <= RC_POLL_DELAY;
+                            state     <= RC_READ_VERSION;
                         else
                             step_idx <= step_idx + 1;
                         end if;
+                    end if;
+
+                when RC_READ_VERSION =>
+                    if spi_issued = '0' and spi_busy = '0' then
+                        spi_start    <= '1';
+                        spi_rw       <= '1'; -- Leitura
+                        spi_reg_addr <= REG_VERSION;
+                        spi_tx_data  <= X"00";
+                        spi_issued   <= '1';
+                    elsif spi_done = '1' then
+                        spi_issued  <= '0';
+                        version_out <= spi_rx_data;
+                        timer_cnt   <= 0;
+                        state       <= RC_POLL_DELAY;
                     end if;
 
                 ----------------------------------------------------------------
@@ -253,18 +303,19 @@ begin
                         spi_issued <= '1';
                         case step_idx is
                             when 0 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_IDLE;
-                            when 1 => spi_reg_addr <= REG_COM_IRQ;     spi_tx_data <= X"7F";
-                            when 2 => spi_reg_addr <= REG_FIFO_LEVEL;  spi_tx_data <= X"80"; -- Flush FIFO
-                            when 3 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"00"; -- 8 bits
-                            when 4 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= PICC_ANTICOLL_CL1; -- 0x93
-                            when 5 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= X"20";             -- NVB = 0x20
-                            when 6 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_TRANSCEIVE;
-                            when 7 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"80"; -- StartSend=1
+                            when 1 => spi_reg_addr <= REG_COLL;        spi_tx_data <= X"00"; -- Clear ValuesAfterColl
+                            when 2 => spi_reg_addr <= REG_COM_IRQ;     spi_tx_data <= X"7F";
+                            when 3 => spi_reg_addr <= REG_FIFO_LEVEL;  spi_tx_data <= X"80"; -- Flush FIFO
+                            when 4 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"00"; -- 8 bits
+                            when 5 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= PICC_ANTICOLL_CL1; -- 0x93
+                            when 6 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= X"20";             -- NVB = 0x20
+                            when 7 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_TRANSCEIVE;
+                            when 8 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"80"; -- StartSend=1
                             when others => spi_reg_addr <= REG_COMMAND; spi_tx_data <= PCD_IDLE;
                         end case;
                     elsif spi_done = '1' then
                         spi_issued <= '0';
-                        if step_idx = 7 then
+                        if step_idx = 8 then
                             step_idx  <= 0;
                             timer_cnt <= 0;
                             state     <= RC_ANTI_WAIT;

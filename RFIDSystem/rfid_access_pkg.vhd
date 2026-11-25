@@ -67,13 +67,19 @@ package rfid_access_pkg is
     constant REG_FIFO_LEVEL    : std_logic_vector(5 downto 0) := "001010"; -- 0x0A
     constant REG_CONTROL       : std_logic_vector(5 downto 0) := "001100"; -- 0x0C
     constant REG_BIT_FRAMING   : std_logic_vector(5 downto 0) := "001101"; -- 0x0D
+    constant REG_COLL          : std_logic_vector(5 downto 0) := "001110"; -- 0x0E
     constant REG_MODE          : std_logic_vector(5 downto 0) := "010001"; -- 0x11
+    constant REG_TX_MODE       : std_logic_vector(5 downto 0) := "010010"; -- 0x12
+    constant REG_RX_MODE       : std_logic_vector(5 downto 0) := "010011"; -- 0x13
     constant REG_TX_CONTROL    : std_logic_vector(5 downto 0) := "010100"; -- 0x14
     constant REG_TX_ASK        : std_logic_vector(5 downto 0) := "010101"; -- 0x15
+    constant REG_MOD_WIDTH     : std_logic_vector(5 downto 0) := "100100"; -- 0x24
+    constant REG_RF_CFG        : std_logic_vector(5 downto 0) := "100110"; -- 0x26
     constant REG_T_MODE        : std_logic_vector(5 downto 0) := "101010"; -- 0x2A
     constant REG_T_PRESCALER   : std_logic_vector(5 downto 0) := "101011"; -- 0x2B
     constant REG_T_RELOAD_H    : std_logic_vector(5 downto 0) := "101100"; -- 0x2C
     constant REG_T_RELOAD_L    : std_logic_vector(5 downto 0) := "101101"; -- 0x2D
+    constant REG_VERSION       : std_logic_vector(5 downto 0) := "110111"; -- 0x37
 
     -- Comandos internos do MFRC522 (CommandReg)
     constant PCD_IDLE          : std_logic_vector(7 downto 0) := X"00";

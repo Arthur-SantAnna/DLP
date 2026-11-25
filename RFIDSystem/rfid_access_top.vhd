@@ -85,6 +85,7 @@ architecture rtl of rfid_access_top is
     signal rc522_uid        : std_logic_vector(31 downto 0);
     signal rc522_valid      : std_logic;
     signal rc522_comm       : std_logic;
+    signal rc522_version    : std_logic_vector(7 downto 0);
 
     -- Sinais multiplexados de Entrada para a FSM de Moore (RC522 Real vs Simulacao SW)
     signal mux_card_detect  : std_logic;
@@ -205,7 +206,8 @@ begin
             rc522_rst_n  => RC522_RST_N,
             card_uid     => rc522_uid,
             card_valid   => rc522_valid,
-            comm_active  => rc522_comm
+            comm_active  => rc522_comm,
+            version_out  => rc522_version
         );
 
     ----------------------------------------------------------------------------
@@ -246,6 +248,7 @@ begin
         port map (
             display_msg   => display_msg,
             uid_in        => last_uid,
+            rc522_version => rc522_version,
             show_uid_mode => SW(8), -- SW[8]='1' mostra o UID Hex completo nos displays
             hex0          => HEX0,
             hex1          => HEX1,

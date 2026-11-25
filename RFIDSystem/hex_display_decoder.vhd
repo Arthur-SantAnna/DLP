@@ -28,7 +28,8 @@ entity hex_display_decoder is
     port (
         display_msg   : in  std_logic_vector(2 downto 0);
         uid_in        : in  std_logic_vector(31 downto 0);
-        show_uid_mode : in  std_logic; -- SW[8]: '0'=Status FSM, '1'=UID Hex completo
+        rc522_version : in  std_logic_vector(7 downto 0);
+        show_uid_mode : in  std_logic; -- SW[8]: '0'=Status FSM, '1'=UID Hex completo (ou VersionReg se UID=0)
         hex0          : out std_logic_vector(6 downto 0);
         hex1          : out std_logic_vector(6 downto 0);
         hex2          : out std_logic_vector(6 downto 0);
@@ -81,16 +82,27 @@ architecture rtl of hex_display_decoder is
 
 begin
 
-    process(display_msg, uid_in, show_uid_mode)
+    process(display_msg, uid_in, rc522_version, show_uid_mode)
     begin
         if show_uid_mode = '1' then
-            -- Modo de Inspecao de UID: Exibe os 6 digitos hexadecimais do cartao
-            hex0 <= nibble_to_7seg(uid_in(3 downto 0));
-            hex1 <= nibble_to_7seg(uid_in(7 downto 4));
-            hex2 <= nibble_to_7seg(uid_in(11 downto 8));
-            hex3 <= nibble_to_7seg(uid_in(15 downto 12));
-            hex4 <= nibble_to_7seg(uid_in(19 downto 16));
-            hex5 <= nibble_to_7seg(uid_in(23 downto 20));
+            if uid_in = X"00000000" then
+                -- Sem cartao lido ainda: exibe "----XX" com o VersionReg (0x37) do RC522
+                -- (0x91/0x92/0x88 = SPI OK | 0xFF ou 0x00 = falha na ligacao SPI)
+                hex0 <= nibble_to_7seg(rc522_version(3 downto 0));
+                hex1 <= nibble_to_7seg(rc522_version(7 downto 4));
+                hex2 <= CHAR_DASH;
+                hex3 <= CHAR_DASH;
+                hex4 <= CHAR_DASH;
+                hex5 <= CHAR_DASH;
+            else
+                -- Modo de Inspecao de UID: Exibe os 6 digitos hexadecimais do cartao
+                hex0 <= nibble_to_7seg(uid_in(3 downto 0));
+                hex1 <= nibble_to_7seg(uid_in(7 downto 4));
+                hex2 <= nibble_to_7seg(uid_in(11 downto 8));
+                hex3 <= nibble_to_7seg(uid_in(15 downto 12));
+                hex4 <= nibble_to_7seg(uid_in(19 downto 16));
+                hex5 <= nibble_to_7seg(uid_in(23 downto 20));
+            end if;
         else
             -- HEX5 e HEX4 sempre mostram o byte inferior (ID curto) do ultimo cartao lido
             hex4 <= nibble_to_7seg(uid_in(3 downto 0));
