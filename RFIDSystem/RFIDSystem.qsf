@@ -30,7 +30,6 @@ set_global_assignment -name VHDL_FILE rc522_controller.vhd
 set_global_assignment -name VHDL_FILE access_control_fsm.vhd
 set_global_assignment -name VHDL_FILE hex_display_decoder.vhd
 set_global_assignment -name VHDL_FILE rfid_access_top.vhd
-set_global_assignment -name VHDL_FILE tb_rfid_access.vhd
 set_global_assignment -name VECTOR_WAVEFORM_FILE Waveform.vwf
 
 # ========================================================================== #

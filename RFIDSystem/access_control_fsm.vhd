@@ -57,14 +57,14 @@ architecture Behavior of access_control_fsm is
 
     signal passo_cnt      : integer range 0 to 15 := 0;
 
-    -- Banco de Registradores para Cadastro Dinamico (Ate 4 Cartoes via KEY[2])
-    constant MAX_CUSTOM_CARDS : integer := 4;
-    type custom_uid_array_type is array (0 to MAX_CUSTOM_CARDS - 1) of std_logic_vector(31 downto 0);
-
+    -- Banco de 4 Registradores para Cadastro Dinamico (Ate 4 Cartoes via KEY[2])
     signal uid_reg        : std_logic_vector(31 downto 0) := (others => '0');
-    signal custom_uids    : custom_uid_array_type := (others => (others => '0'));
-    signal custom_valid   : std_logic_vector(MAX_CUSTOM_CARDS - 1 downto 0) := (others => '0');
-    signal custom_wr_idx  : integer range 0 to MAX_CUSTOM_CARDS - 1 := 0;
+    signal custom_uid_0   : std_logic_vector(31 downto 0) := (others => '0');
+    signal custom_uid_1   : std_logic_vector(31 downto 0) := (others => '0');
+    signal custom_uid_2   : std_logic_vector(31 downto 0) := (others => '0');
+    signal custom_uid_3   : std_logic_vector(31 downto 0) := (others => '0');
+    signal custom_valid   : std_logic_vector(3 downto 0)  := "0000";
+    signal custom_wr_idx  : integer range 0 to 3 := 0;
     signal id_valido      : std_logic := '0';
     signal fail_count     : unsigned(1 downto 0) := "00";
 
@@ -73,7 +73,7 @@ begin
     ----------------------------------------------------------------------------
     -- Comparador Combinacional de Autorizacao (Lista Interna ROM + 4 Slots Dinamicos)
     ----------------------------------------------------------------------------
-    process(uid_reg, custom_uids, custom_valid)
+    process(uid_reg, custom_uid_0, custom_uid_1, custom_uid_2, custom_uid_3, custom_valid)
         variable match : std_logic;
     begin
         match := '0';
@@ -85,11 +85,12 @@ begin
         end loop;
 
         -- Compara tambem com os ate 4 cartoes cadastrados em tempo real via KEY[2]
-        for i in 0 to MAX_CUSTOM_CARDS - 1 loop
-            if custom_valid(i) = '1' and uid_reg = custom_uids(i) then
-                match := '1';
-            end if;
-        end loop;
+        if (custom_valid(0) = '1' and uid_reg = custom_uid_0) or
+           (custom_valid(1) = '1' and uid_reg = custom_uid_1) or
+           (custom_valid(2) = '1' and uid_reg = custom_uid_2) or
+           (custom_valid(3) = '1' and uid_reg = custom_uid_3) then
+            match := '1';
+        end if;
 
         id_valido <= match;
     end process;
@@ -98,33 +99,46 @@ begin
     -- Processo de Cadastro Dinamico de Cartoes (Ate 4 Cartoes via KEY[2])
     ----------------------------------------------------------------------------
     process(clk, reset_n)
-        variable already_enrolled : boolean;
     begin
         if reset_n = '0' then
-            custom_uids   <= (others => (others => '0'));
-            custom_valid  <= (others => '0');
+            custom_uid_0  <= (others => '0');
+            custom_uid_1  <= (others => '0');
+            custom_uid_2  <= (others => '0');
+            custom_uid_3  <= (others => '0');
+            custom_valid  <= "0000";
             custom_wr_idx <= 0;
         elsif rising_edge(clk) then
             if clear_enroll = '1' then
-                custom_uids   <= (others => (others => '0'));
-                custom_valid  <= (others => '0');
+                custom_uid_0  <= (others => '0');
+                custom_uid_1  <= (others => '0');
+                custom_uid_2  <= (others => '0');
+                custom_uid_3  <= (others => '0');
+                custom_valid  <= "0000";
                 custom_wr_idx <= 0;
             elsif enroll_btn = '1' and uid_reg /= X"00000000" then
-                already_enrolled := false;
-                for i in 0 to MAX_CUSTOM_CARDS - 1 loop
-                    if custom_valid(i) = '1' and custom_uids(i) = uid_reg then
-                        already_enrolled := true;
-                    end if;
-                end loop;
-
-                if not already_enrolled then
-                    custom_uids(custom_wr_idx)  <= uid_reg;
-                    custom_valid(custom_wr_idx) <= '1';
-                    if custom_wr_idx = MAX_CUSTOM_CARDS - 1 then
-                        custom_wr_idx <= 0;
-                    else
-                        custom_wr_idx <= custom_wr_idx + 1;
-                    end if;
+                -- Evita duplicar se o mesmo cartao ja estiver salvo em algum slot
+                if not ((custom_valid(0) = '1' and custom_uid_0 = uid_reg) or
+                        (custom_valid(1) = '1' and custom_uid_1 = uid_reg) or
+                        (custom_valid(2) = '1' and custom_uid_2 = uid_reg) or
+                        (custom_valid(3) = '1' and custom_uid_3 = uid_reg)) then
+                    case custom_wr_idx is
+                        when 0 =>
+                            custom_uid_0    <= uid_reg;
+                            custom_valid(0) <= '1';
+                            custom_wr_idx   <= 1;
+                        when 1 =>
+                            custom_uid_1    <= uid_reg;
+                            custom_valid(1) <= '1';
+                            custom_wr_idx   <= 2;
+                        when 2 =>
+                            custom_uid_2    <= uid_reg;
+                            custom_valid(2) <= '1';
+                            custom_wr_idx   <= 3;
+                        when others =>
+                            custom_uid_3    <= uid_reg;
+                            custom_valid(3) <= '1';
+                            custom_wr_idx   <= 0;
+                    end case;
                 end if;
             end if;
         end if;
@@ -294,6 +308,6 @@ begin
     -- Saidas de diagnostico
     fail_count_out  <= std_logic_vector(fail_count);
     last_uid_out    <= uid_reg;
-    enrolled_active <= '1' when custom_valid /= "0000" else '0';
+    enrolled_active <= custom_valid(0) or custom_valid(1) or custom_valid(2) or custom_valid(3);
 
 end architecture Behavior;

@@ -67,7 +67,7 @@ architecture rtl of rc522_controller is
     -- Contadores de tempo (50 MHz: 50_000 ciclos = 1 ms)
     constant BOOT_CYCLES       : integer := 250000;   -- 5 ms
     constant SOFT_RESET_CYCLES : integer := 2500000;  -- 50 ms apos Soft Reset (datasheet MFRC522)
-    constant TRANS_CYCLES      : integer := 500000;   -- 10 ms para resposta RF do cartao
+    constant TRANS_CYCLES      : integer := 200000;   -- 4 ms para resposta RF do cartao
     constant POLL_CYCLES       : integer := 2500000;  -- 50 ms entre leituras
     constant COOLDOWN_CYCLES   : integer := 50000000; -- 1.0 s de intervalo apos ler um cartao
 
@@ -157,7 +157,7 @@ begin
                     end if;
 
                 ----------------------------------------------------------------
-                -- 3. Inicializacao dos Registradores Internos do MFRC522
+                -- 3. Inicializacao/Refresh dos Registradores Internos do MFRC522
                 ----------------------------------------------------------------
                 when RC_INIT_SEQ =>
                     comm_active <= '1';
@@ -166,22 +166,18 @@ begin
                         spi_rw     <= '0'; -- Escrita
                         spi_issued <= '1';
                         case step_idx is
-                            when 0  => spi_reg_addr <= REG_TX_MODE;     spi_tx_data <= X"00"; -- 106 kbps, CRC off
-                            when 1  => spi_reg_addr <= REG_RX_MODE;     spi_tx_data <= X"00"; -- 106 kbps, CRC off
-                            when 2  => spi_reg_addr <= REG_MOD_WIDTH;   spi_tx_data <= X"26"; -- Padrao MFRC522
-                            when 3  => spi_reg_addr <= REG_T_MODE;      spi_tx_data <= X"8D"; -- TAuto=1
-                            when 4  => spi_reg_addr <= REG_T_PRESCALER; spi_tx_data <= X"3E"; -- TPrescaler
-                            when 5  => spi_reg_addr <= REG_T_RELOAD_L;  spi_tx_data <= X"1E"; -- Timeout 30
-                            when 6  => spi_reg_addr <= REG_T_RELOAD_H;  spi_tx_data <= X"00";
-                            when 7  => spi_reg_addr <= REG_TX_ASK;      spi_tx_data <= X"40"; -- 100% ASK
-                            when 8  => spi_reg_addr <= REG_MODE;        spi_tx_data <= X"3D"; -- CRC 0x6363
-                            when 9  => spi_reg_addr <= REG_RF_CFG;      spi_tx_data <= X"70"; -- Ganho RX maximo (48 dB)
-                            when 10 => spi_reg_addr <= REG_TX_CONTROL;  spi_tx_data <= X"83"; -- Liga Antena TX1/TX2
+                            when 0 => spi_reg_addr <= REG_T_MODE;      spi_tx_data <= X"8D"; -- TAuto=1
+                            when 1 => spi_reg_addr <= REG_T_PRESCALER; spi_tx_data <= X"3E"; -- TPrescaler
+                            when 2 => spi_reg_addr <= REG_T_RELOAD_L;  spi_tx_data <= X"1E"; -- Timeout 30
+                            when 3 => spi_reg_addr <= REG_T_RELOAD_H;  spi_tx_data <= X"00";
+                            when 4 => spi_reg_addr <= REG_TX_ASK;      spi_tx_data <= X"40"; -- 100% ASK
+                            when 5 => spi_reg_addr <= REG_MODE;        spi_tx_data <= X"3D"; -- CRC 0x6363
+                            when 6 => spi_reg_addr <= REG_TX_CONTROL;  spi_tx_data <= X"83"; -- Liga Antena TX1/TX2
                             when others => spi_reg_addr <= REG_COMMAND; spi_tx_data <= PCD_IDLE;
                         end case;
                     elsif spi_done = '1' then
                         spi_issued <= '0';
-                        if step_idx = 10 then
+                        if step_idx = 6 then
                             step_idx  <= 0;
                             timer_cnt <= 0;
                             state     <= RC_READ_VERSION;
@@ -201,11 +197,13 @@ begin
                         spi_issued  <= '0';
                         version_out <= spi_rx_data;
                         timer_cnt   <= 0;
-                        state       <= RC_POLL_DELAY;
+                        step_idx    <= 0;
+                        state       <= RC_REQ_SEQ;
                     end if;
 
                 ----------------------------------------------------------------
-                -- 3. Intervalo de Polling entre buscas de cartao (50 ms)
+                -- 4. Intervalo de Polling entre buscas de cartao (50 ms)
+                --    Ao final, passa por RC_INIT_SEQ para garantir antena ativa
                 ----------------------------------------------------------------
                 when RC_POLL_DELAY =>
                     comm_active <= '0';
@@ -213,7 +211,7 @@ begin
                         timer_cnt  <= 0;
                         step_idx   <= 0;
                         spi_issued <= '0';
-                        state      <= RC_REQ_SEQ;
+                        state      <= RC_INIT_SEQ;
                     else
                         timer_cnt <= timer_cnt + 1;
                     end if;
@@ -303,19 +301,18 @@ begin
                         spi_issued <= '1';
                         case step_idx is
                             when 0 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_IDLE;
-                            when 1 => spi_reg_addr <= REG_COLL;        spi_tx_data <= X"00"; -- Clear ValuesAfterColl
-                            when 2 => spi_reg_addr <= REG_COM_IRQ;     spi_tx_data <= X"7F";
-                            when 3 => spi_reg_addr <= REG_FIFO_LEVEL;  spi_tx_data <= X"80"; -- Flush FIFO
-                            when 4 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"00"; -- 8 bits
-                            when 5 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= PICC_ANTICOLL_CL1; -- 0x93
-                            when 6 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= X"20";             -- NVB = 0x20
-                            when 7 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_TRANSCEIVE;
-                            when 8 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"80"; -- StartSend=1
+                            when 1 => spi_reg_addr <= REG_COM_IRQ;     spi_tx_data <= X"7F";
+                            when 2 => spi_reg_addr <= REG_FIFO_LEVEL;  spi_tx_data <= X"80"; -- Flush FIFO
+                            when 3 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"00"; -- 8 bits
+                            when 4 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= PICC_ANTICOLL_CL1; -- 0x93
+                            when 5 => spi_reg_addr <= REG_FIFO_DATA;   spi_tx_data <= X"20";             -- NVB = 0x20
+                            when 6 => spi_reg_addr <= REG_COMMAND;     spi_tx_data <= PCD_TRANSCEIVE;
+                            when 7 => spi_reg_addr <= REG_BIT_FRAMING; spi_tx_data <= X"80"; -- StartSend=1
                             when others => spi_reg_addr <= REG_COMMAND; spi_tx_data <= PCD_IDLE;
                         end case;
                     elsif spi_done = '1' then
                         spi_issued <= '0';
-                        if step_idx = 8 then
+                        if step_idx = 7 then
                             step_idx  <= 0;
                             timer_cnt <= 0;
                             state     <= RC_ANTI_WAIT;
