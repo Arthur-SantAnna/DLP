@@ -72,16 +72,6 @@ SIGNAL("card_uid_in")
 	PARENT = "";
 }
 
-SIGNAL("trava_aberta")
-{
-	VALUE_TYPE = NINE_LEVEL_BIT;
-	SIGNAL_TYPE = SINGLE_BIT;
-	WIDTH = 1;
-	LSB_INDEX = -1;
-	DIRECTION = OUTPUT;
-	PARENT = "";
-}
-
 SIGNAL("led_autorizado")
 {
 	VALUE_TYPE = NINE_LEVEL_BIT;
@@ -262,7 +252,7 @@ DISPLAY_LINE
 
 DISPLAY_LINE
 {
-	CHANNEL = "trava_aberta";
+	CHANNEL = "led_autorizado";
 	EXPAND_STATUS = COLLAPSED;
 	RADIX = Binary;
 	TREE_INDEX = 7;
@@ -271,7 +261,7 @@ DISPLAY_LINE
 
 DISPLAY_LINE
 {
-	CHANNEL = "led_autorizado";
+	CHANNEL = "led_negado";
 	EXPAND_STATUS = COLLAPSED;
 	RADIX = Binary;
 	TREE_INDEX = 8;
@@ -280,18 +270,9 @@ DISPLAY_LINE
 
 DISPLAY_LINE
 {
-	CHANNEL = "led_negado";
-	EXPAND_STATUS = COLLAPSED;
-	RADIX = Binary;
-	TREE_INDEX = 9;
-	TREE_LEVEL = 0;
-}
-
-DISPLAY_LINE
-{
 	CHANNEL = "led_bloqueado";
 	EXPAND_STATUS = COLLAPSED;
 	RADIX = Binary;
-	TREE_INDEX = 10;
+	TREE_INDEX = 9;
 	TREE_LEVEL = 0;
 }

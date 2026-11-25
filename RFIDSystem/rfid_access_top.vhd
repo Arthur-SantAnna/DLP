@@ -44,13 +44,12 @@ entity rfid_access_top is
         HEX4          : out std_logic_vector(6 downto 0);
         HEX5          : out std_logic_vector(6 downto 0);
 
-        -- Pinos do Header GPIO_0 para o Modulo RFID-RC522 (3.3V SPI) e Atuador
+        -- Pinos do Header GPIO_0 para o Modulo RFID-RC522 (3.3V SPI)
         RC522_CS_N    : out std_logic;                    -- GPIO_0[0] (PIN_N16) -> SDA/NSS
         RC522_SCK     : out std_logic;                    -- GPIO_0[1] (PIN_B16) -> SCK
         RC522_MOSI    : out std_logic;                    -- GPIO_0[2] (PIN_M16) -> MOSI
         RC522_MISO    : in  std_logic;                    -- GPIO_0[3] (PIN_C16) -> MISO
-        RC522_RST_N   : out std_logic;                    -- GPIO_0[4] (PIN_D17) -> RST
-        LOCK_ACTUATOR : out std_logic                     -- GPIO_0[5] (PIN_K20) -> Rele/Solenoide
+        RC522_RST_N   : out std_logic                     -- GPIO_0[4] (PIN_D17) -> RST
     );
 end entity rfid_access_top;
 
@@ -92,7 +91,6 @@ architecture rtl of rfid_access_top is
     signal mux_card_uid     : std_logic_vector(31 downto 0);
 
     -- Sinais de Saida da Maquina de Estados de Moore
-    signal trava_aberta     : std_logic;
     signal led_autorizado   : std_logic;
     signal led_negado       : std_logic;
     signal led_bloqueado    : std_logic;
@@ -230,7 +228,6 @@ begin
             card_uid_in     => mux_card_uid,
             enroll_btn      => enroll_pulse,
             clear_enroll    => clear_pulse,
-            trava_aberta    => trava_aberta,
             led_autorizado  => led_autorizado,
             led_negado      => led_negado,
             led_bloqueado   => led_bloqueado,
@@ -259,13 +256,11 @@ begin
         );
 
     ----------------------------------------------------------------------------
-    -- Mapeamento das Saidas Fisicas (LEDs e Atuador/Trava)
+    -- Mapeamento das Saidas Fisicas (LEDs da Placa DE0-CV)
     ----------------------------------------------------------------------------
-    LOCK_ACTUATOR    <= trava_aberta;       -- Pino GPIO_0[5] para Rele/Trava Eletrica
-
     LEDR(2 downto 0) <= state_code;         -- Codigo binario do Estado Atual da FSM de Moore
     LEDR(4 downto 3) <= fail_count;         -- Contador de tentativas invalidas (0 a 3)
-    LEDR(5)          <= enrolled_active;    -- Aceso quando ha um cartao dinamico salvo (KEY[2])
+    LEDR(5)          <= enrolled_active;    -- Aceso quando ha pelo menos 1 cartao dinamico salvo (KEY[2])
     LEDR(6)          <= led_bloqueado;      -- Indica Estado S_BLOQUEADO (Alarme)
     LEDR(7)          <= sig_sinal_div;      -- Pisca a 2 Hz indicando o Divisor de Frequencia ativo!
     LEDR(8)          <= led_negado;         -- Indica Acesso Negado / Erro

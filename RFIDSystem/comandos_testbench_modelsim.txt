@@ -33,8 +33,7 @@ add wave -radix unsigned /tb_rfid_access/UUT/u_access_fsm/passo_cnt
 add wave /tb_rfid_access/UUT/u_access_fsm/id_valido
 add wave -radix unsigned /tb_rfid_access/UUT/u_access_fsm/fail_count
 
-add wave -divider "SAIDAS DE MOORE (ATUADOR, LEDS E DISPLAYS)"
-add wave /tb_rfid_access/LOCK_ACTUATOR
+add wave -divider "SAIDAS DE MOORE (LEDS E DISPLAYS)"
 add wave /tb_rfid_access/UUT/led_autorizado
 add wave /tb_rfid_access/UUT/led_negado
 add wave /tb_rfid_access/UUT/led_bloqueado

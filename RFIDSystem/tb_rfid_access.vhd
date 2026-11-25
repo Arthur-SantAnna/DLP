@@ -39,7 +39,6 @@ architecture sim of tb_rfid_access is
     signal RC522_MOSI    : std_logic;
     signal RC522_MISO    : std_logic := '0';
     signal RC522_RST_N   : std_logic;
-    signal LOCK_ACTUATOR : std_logic;
 
     signal sim_finished  : boolean := false;
 
@@ -71,8 +70,7 @@ begin
             RC522_SCK     => RC522_SCK,
             RC522_MOSI    => RC522_MOSI,
             RC522_MISO    => RC522_MISO,
-            RC522_RST_N   => RC522_RST_N,
-            LOCK_ACTUATOR => LOCK_ACTUATOR
+            RC522_RST_N   => RC522_RST_N
         );
 
     -- Processo de Estimulos de Teste
@@ -95,8 +93,8 @@ begin
         RESET_N <= '1';
         wait for 4 * CLK_PERIOD;
 
-        -- Verifica que iniciou em S_AGUARDANDO (state_code = "000", trava = '0')
-        assert LEDR(2 downto 0) = "000" and LOCK_ACTUATOR = '0'
+        -- Verifica que iniciou em S_AGUARDANDO (state_code = "000", LEDR(9) = '0')
+        assert LEDR(2 downto 0) = "000" and LEDR(9) = '0'
             report "Erro: Estado inicial deveria ser S_AGUARDANDO (000)" severity error;
 
         ------------------------------------------------------------------------
@@ -106,12 +104,12 @@ begin
 
         -- Aguarda 2 pulsos_avanco (S_LENDO -> S_VERIFICANDO -> S_AUTORIZADO = ~10 ciclos)
         wait for 10 * CLK_PERIOD;
-        assert LEDR(2 downto 0) = "011" and LOCK_ACTUATOR = '1' and LEDR(9) = '1'
+        assert LEDR(2 downto 0) = "011" and LEDR(9) = '1'
             report "Erro Caso 1: Cartao 0xA5 deveria liberar o acesso (S_AUTORIZADO)" severity error;
 
         -- Aguarda fim dos 6 pulsos_avanco de porta aberta (24 ciclos) e retorno a S_AGUARDANDO
         wait for 26 * CLK_PERIOD;
-        assert LEDR(2 downto 0) = "000" and LOCK_ACTUATOR = '0'
+        assert LEDR(2 downto 0) = "000" and LEDR(9) = '0'
             report "Erro Caso 1: Deveria retornar para S_AGUARDANDO apos temporizador" severity error;
 
         ------------------------------------------------------------------------
@@ -120,7 +118,7 @@ begin
         -- 1a Tentativa Invalida (ID = 0x11)
         present_card(X"11");
         wait for 10 * CLK_PERIOD;
-        assert LEDR(2 downto 0) = "100" and LEDR(8) = '1' and LOCK_ACTUATOR = '0'
+        assert LEDR(2 downto 0) = "100" and LEDR(8) = '1' and LEDR(9) = '0'
             report "Erro Caso 2.1: Cartao 0x11 deveria ir para S_NEGADO" severity error;
         wait for 18 * CLK_PERIOD; -- Aguarda os 4 pulsos_avanco de S_NEGADO e volta a S_AGUARDANDO
 
@@ -134,7 +132,7 @@ begin
         -- 3a Tentativa Invalida (ID = 0x33) -> Deve entrar em S_BLOQUEADO ("101")!
         present_card(X"33");
         wait for 10 * CLK_PERIOD;
-        assert LEDR(2 downto 0) = "101" and LEDR(6) = '1' and LOCK_ACTUATOR = '0'
+        assert LEDR(2 downto 0) = "101" and LEDR(6) = '1' and LEDR(9) = '0'
             report "Erro Caso 2.3: Na 3a falha consecutiva deveria entrar em S_BLOQUEADO (101)" severity error;
 
         -- Aguarda o desbloqueio automatico apos 10 pulsos_avanco (40 ciclos)
@@ -143,7 +141,7 @@ begin
             report "Erro Caso 2.3: Deveria retornar a S_AGUARDANDO apos fim do bloqueio" severity error;
 
         ------------------------------------------------------------------------
-        -- CASO 3: Cadastro Dinamico do Cartao 0x33 via Botao KEY[2]
+        -- CASO 3: Cadastro Dinamico de Cartao via Botao KEY[2] (Ate 4 Cartoes)
         ------------------------------------------------------------------------
         -- Pressiona KEY[2] para cadastrar o ultimo UID lido (0x33)
         KEY(2) <= '0';
@@ -156,7 +154,7 @@ begin
         -- Apresenta novamente o Cartao 0x33 -> Agora deve ser AUTORIZADO!
         present_card(X"33");
         wait for 10 * CLK_PERIOD;
-        assert LEDR(2 downto 0) = "011" and LOCK_ACTUATOR = '1' and LEDR(9) = '1'
+        assert LEDR(2 downto 0) = "011" and LEDR(9) = '1'
             report "Erro Caso 3: Cartao recem-cadastrado 0x33 deveria ser AUTORIZADO!" severity error;
 
         wait for 30 * CLK_PERIOD;

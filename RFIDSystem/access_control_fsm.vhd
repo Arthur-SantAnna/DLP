@@ -27,12 +27,11 @@ entity access_control_fsm is
         -- Entradas de Eventos de Cartao RFID
         card_detected   : in  std_logic; -- Pulso indicando presenca de cartao
         card_uid_in     : in  std_logic_vector(31 downto 0);
-        -- Cadastro Dinamico de Cartao na Placa (Botao KEY[2] e KEY[3])
-        enroll_btn      : in  std_logic; -- Cadastra o ultimo UID lido como autorizado
-        clear_enroll    : in  std_logic; -- Remove o UID cadastrado dinamicamente
+        -- Cadastro Dinamico de Cartoes na Placa (Botao KEY[2] e KEY[3] - ate 4 cartoes)
+        enroll_btn      : in  std_logic; -- Cadastra o ultimo UID lido em um dos 4 slots
+        clear_enroll    : in  std_logic; -- Remove todos os UIDs cadastrados dinamicamente
         -- Saidas Puras de Moore (Dependem exclusivamente do Estado Atual)
-        trava_aberta    : out std_logic;                    -- Aciona atuador/rele e LED de Sucesso
-        led_autorizado  : out std_logic;                    -- Indica estado S_AUTORIZADO
+        led_autorizado  : out std_logic;                    -- Indica estado S_AUTORIZADO (Trava Aberta)
         led_negado      : out std_logic;                    -- Indica estado S_NEGADO
         led_bloqueado   : out std_logic;                    -- Indica estado S_BLOQUEADO
         display_msg     : out std_logic_vector(2 downto 0); -- Codigo da palavra para HEX3..HEX0
@@ -40,7 +39,7 @@ entity access_control_fsm is
         -- Saidas Auxiliares de Diagnostico
         fail_count_out  : out std_logic_vector(1 downto 0); -- Numero de erros consecutivos (0 a 3)
         last_uid_out    : out std_logic_vector(31 downto 0);-- Ultimo UID capturado
-        enrolled_active : out std_logic                     -- '1' se ha um cartao dinamico salvo
+        enrolled_active : out std_logic                     -- '1' se ha pelo menos 1 cartao dinamico salvo
     );
 end entity access_control_fsm;
 
@@ -58,19 +57,23 @@ architecture Behavior of access_control_fsm is
 
     signal passo_cnt      : integer range 0 to 15 := 0;
 
-    -- Registradores de Dados de Apoio
+    -- Banco de Registradores para Cadastro Dinamico (Ate 4 Cartoes via KEY[2])
+    constant MAX_CUSTOM_CARDS : integer := 4;
+    type custom_uid_array_type is array (0 to MAX_CUSTOM_CARDS - 1) of std_logic_vector(31 downto 0);
+
     signal uid_reg        : std_logic_vector(31 downto 0) := (others => '0');
-    signal custom_uid_reg : std_logic_vector(31 downto 0) := (others => '0');
-    signal custom_valid   : std_logic := '0';
+    signal custom_uids    : custom_uid_array_type := (others => (others => '0'));
+    signal custom_valid   : std_logic_vector(MAX_CUSTOM_CARDS - 1 downto 0) := (others => '0');
+    signal custom_wr_idx  : integer range 0 to MAX_CUSTOM_CARDS - 1 := 0;
     signal id_valido      : std_logic := '0';
     signal fail_count     : unsigned(1 downto 0) := "00";
 
 begin
 
     ----------------------------------------------------------------------------
-    -- Comparador Combinacional de Autorizacao (Lista Interna ROM + Slot Dinamico)
+    -- Comparador Combinacional de Autorizacao (Lista Interna ROM + 4 Slots Dinamicos)
     ----------------------------------------------------------------------------
-    process(uid_reg, custom_uid_reg, custom_valid)
+    process(uid_reg, custom_uids, custom_valid)
         variable match : std_logic;
     begin
         match := '0';
@@ -81,29 +84,48 @@ begin
             end if;
         end loop;
 
-        -- Compara tambem com o cartao cadastrado em tempo real via KEY[2]
-        if custom_valid = '1' and uid_reg = custom_uid_reg then
-            match := '1';
-        end if;
+        -- Compara tambem com os ate 4 cartoes cadastrados em tempo real via KEY[2]
+        for i in 0 to MAX_CUSTOM_CARDS - 1 loop
+            if custom_valid(i) = '1' and uid_reg = custom_uids(i) then
+                match := '1';
+            end if;
+        end loop;
 
         id_valido <= match;
     end process;
 
     ----------------------------------------------------------------------------
-    -- Processo de Cadastro Dinamico de Cartao (Permite cadastrar a tag do kit)
+    -- Processo de Cadastro Dinamico de Cartoes (Ate 4 Cartoes via KEY[2])
     ----------------------------------------------------------------------------
     process(clk, reset_n)
+        variable already_enrolled : boolean;
     begin
         if reset_n = '0' then
-            custom_uid_reg <= (others => '0');
-            custom_valid   <= '0';
+            custom_uids   <= (others => (others => '0'));
+            custom_valid  <= (others => '0');
+            custom_wr_idx <= 0;
         elsif rising_edge(clk) then
             if clear_enroll = '1' then
-                custom_uid_reg <= (others => '0');
-                custom_valid   <= '0';
+                custom_uids   <= (others => (others => '0'));
+                custom_valid  <= (others => '0');
+                custom_wr_idx <= 0;
             elsif enroll_btn = '1' and uid_reg /= X"00000000" then
-                custom_uid_reg <= uid_reg;
-                custom_valid   <= '1';
+                already_enrolled := false;
+                for i in 0 to MAX_CUSTOM_CARDS - 1 loop
+                    if custom_valid(i) = '1' and custom_uids(i) = uid_reg then
+                        already_enrolled := true;
+                    end if;
+                end loop;
+
+                if not already_enrolled then
+                    custom_uids(custom_wr_idx)  <= uid_reg;
+                    custom_valid(custom_wr_idx) <= '1';
+                    if custom_wr_idx = MAX_CUSTOM_CARDS - 1 then
+                        custom_wr_idx <= 0;
+                    else
+                        custom_wr_idx <= custom_wr_idx + 1;
+                    end if;
+                end if;
             end if;
         end if;
     end process;
@@ -218,7 +240,6 @@ begin
     process(estado)
     begin
         -- Valores padrao seguros
-        trava_aberta   <= '0';
         led_autorizado <= '0';
         led_negado     <= '0';
         led_bloqueado  <= '0';
@@ -227,7 +248,6 @@ begin
 
         case estado is
             when S_AGUARDANDO =>
-                trava_aberta   <= '0';
                 led_autorizado <= '0';
                 led_negado     <= '0';
                 led_bloqueado  <= '0';
@@ -235,7 +255,6 @@ begin
                 state_code     <= "000";
 
             when S_LENDO =>
-                trava_aberta   <= '0';
                 led_autorizado <= '0';
                 led_negado     <= '0';
                 led_bloqueado  <= '0';
@@ -243,7 +262,6 @@ begin
                 state_code     <= "001";
 
             when S_VERIFICANDO =>
-                trava_aberta   <= '0';
                 led_autorizado <= '0';
                 led_negado     <= '0';
                 led_bloqueado  <= '0';
@@ -251,15 +269,13 @@ begin
                 state_code     <= "010";
 
             when S_AUTORIZADO =>
-                trava_aberta   <= '1';      -- Libera o acesso / Aciona rele
-                led_autorizado <= '1';      -- Acende LED de Sucesso
+                led_autorizado <= '1';      -- Acende LED de Sucesso / Trava Aberta (LEDR[9])
                 led_negado     <= '0';
                 led_bloqueado  <= '0';
                 display_msg    <= MSG_OPEN; -- "OPEn"
                 state_code     <= "011";
 
             when S_NEGADO =>
-                trava_aberta   <= '0';
                 led_autorizado <= '0';
                 led_negado     <= '1';      -- Acende LED de Erro
                 led_bloqueado  <= '0';
@@ -267,7 +283,6 @@ begin
                 state_code     <= "100";
 
             when S_BLOQUEADO =>
-                trava_aberta   <= '0';
                 led_autorizado <= '0';
                 led_negado     <= '1';
                 led_bloqueado  <= '1';      -- Acende LED de Alarme/Bloqueio
@@ -279,6 +294,6 @@ begin
     -- Saidas de diagnostico
     fail_count_out  <= std_logic_vector(fail_count);
     last_uid_out    <= uid_reg;
-    enrolled_active <= custom_valid;
+    enrolled_active <= '1' when custom_valid /= "0000" else '0';
 
 end architecture Behavior;

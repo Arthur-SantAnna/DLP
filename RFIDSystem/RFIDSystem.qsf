@@ -189,10 +189,6 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to RC522_MISO
 set_location_assignment PIN_D17 -to RC522_RST_N
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RC522_RST_N
 
-# Pino 6 do Header JP1 (GPIO_0[5]) -> Acionamento de Rele / Trava Eletrica
-set_location_assignment PIN_K20 -to LOCK_ACTUATOR
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LOCK_ACTUATOR
-
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top

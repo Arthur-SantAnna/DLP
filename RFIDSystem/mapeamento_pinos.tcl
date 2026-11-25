@@ -130,14 +130,13 @@ for {set i 0} {$i < 7} {incr i} {
 }
 
 # ------------------------------------------------------------------------------
-# 6. MODULO RFID-RC522 (SPI) E ATUADOR NO HEADER GPIO_0 (JP1) [Manual Tabela 3-11]
+# 6. MODULO RFID-RC522 (SPI) NO HEADER GPIO_0 (JP1) [Manual Tabela 3-11]
 # ------------------------------------------------------------------------------
 set_location_assignment PIN_N16 -to RC522_CS_N    ;# GPIO_0[0] (Pino 1 do JP1)
 set_location_assignment PIN_B16 -to RC522_SCK     ;# GPIO_0[1] (Pino 2 do JP1)
 set_location_assignment PIN_M16 -to RC522_MOSI    ;# GPIO_0[2] (Pino 3 do JP1)
 set_location_assignment PIN_C16 -to RC522_MISO    ;# GPIO_0[3] (Pino 4 do JP1)
 set_location_assignment PIN_D17 -to RC522_RST_N   ;# GPIO_0[4] (Pino 5 do JP1)
-set_location_assignment PIN_K20 -to LOCK_ACTUATOR ;# GPIO_0[5] (Pino 6 do JP1)
 
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RC522_CS_N
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RC522_SCK
@@ -145,7 +144,6 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RC522_MOSI
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RC522_MISO
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON  -to RC522_MISO
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RC522_RST_N
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LOCK_ACTUATOR
 
 # Salva as atribuicoes no arquivo .qsf do projeto
 export_assignments
