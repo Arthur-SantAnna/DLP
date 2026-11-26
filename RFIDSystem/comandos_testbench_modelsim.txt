@@ -1,0 +1,48 @@
+# ==============================================================================
+# COMANDOS PARA SIMULACAO NO MODELSIM (Padrao da Disciplina DLP)
+# ==============================================================================
+# Copie e cole os comandos abaixo no console "Transcript" do ModelSim-Altera:
+
+# 1. Entre na pasta do projeto (ajuste o caminho se necessario no Windows/Mac)
+# cd C:/caminho/para/RFIDSystem
+
+# 2. Crie a biblioteca work e compile todos os arquivos VHDL na ordem de dependencia
+vlib work
+
+vcom -work work rfid_access_pkg.vhd divisor_frequencia.vhd spi_master.vhd rc522_controller.vhd access_control_fsm.vhd hex_display_decoder.vhd rfid_access_top.vhd tb_rfid_access.vhd
+
+# 3. Inicie a simulacao do Testbench
+vsim work.tb_rfid_access
+
+# 4. Adicione os sinais principais e os sinais internos da FSM de Moore e Divisor na janela Wave
+add wave -divider "CLOCK E DIVISOR DE FREQUENCIA"
+add wave /tb_rfid_access/CLOCK_50
+add wave /tb_rfid_access/RESET_N
+add wave /tb_rfid_access/UUT/sig_sinal_div
+add wave /tb_rfid_access/UUT/sig_pulso_avanco
+
+add wave -divider "ENTRADAS E LEITURA DE CARTAO"
+add wave /tb_rfid_access/KEY
+add wave -radix hexadecimal /tb_rfid_access/SW
+add wave /tb_rfid_access/UUT/mux_card_detect
+add wave -radix hexadecimal /tb_rfid_access/UUT/mux_card_uid
+
+add wave -divider "MAQUINA DE ESTADOS DE MOORE (INTERNO)"
+add wave /tb_rfid_access/UUT/u_access_fsm/estado
+add wave -radix unsigned /tb_rfid_access/UUT/u_access_fsm/passo_cnt
+add wave /tb_rfid_access/UUT/u_access_fsm/id_valido
+add wave -radix unsigned /tb_rfid_access/UUT/u_access_fsm/fail_count
+
+add wave -divider "SAIDAS DE MOORE (LEDS E DISPLAYS)"
+add wave /tb_rfid_access/UUT/led_autorizado
+add wave /tb_rfid_access/UUT/led_negado
+add wave /tb_rfid_access/UUT/led_bloqueado
+add wave /tb_rfid_access/LEDR
+add wave /tb_rfid_access/HEX3
+add wave /tb_rfid_access/HEX2
+add wave /tb_rfid_access/HEX1
+add wave /tb_rfid_access/HEX0
+
+# 5. Execute toda a simulacao (~3600 ns)
+run -all
+wave zoom full
